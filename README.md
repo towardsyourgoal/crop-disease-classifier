@@ -4,6 +4,8 @@ Image classifier for plant leaf diseases, trained on 12 classes of the
 [PlantVillage dataset](https://www.kaggle.com/datasets/abdallahalidev/plantvillage-dataset)
 and served as a FastAPI app on Vercel.
 
+**Live demo: https://crop-disease-classifier.vercel.app**
+
 ## Model comparison (held-out test set, 1,952 images)
 
 | Model | Accuracy | Macro F1 | Params (M) | Size (MB) | CPU latency (ms) |
@@ -36,7 +38,7 @@ data/pull_data.py      Downloads the dataset via kagglehub
 ## API
 
 ```bash
-curl -F "file=@leaf.jpg" "https://<your-app>.vercel.app/api/predict?top_k=3"
+curl -F "file=@leaf.jpg" "https://crop-disease-classifier.vercel.app/api/predict?top_k=3"
 ```
 
 ```json
