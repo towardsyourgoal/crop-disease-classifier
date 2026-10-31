@@ -6,6 +6,8 @@ and served as a FastAPI app on Vercel.
 
 **Live demo: https://crop-disease-classifier.vercel.app**
 
+<a href="https://crop-disease-classifier.vercel.app"><img src="docs/screenshot.png" alt="Crop Disease Classifier web app" width="600"></a>
+
 ## Model comparison (held-out test set, 1,952 images)
 
 | Model | Accuracy | Macro F1 | Params (M) | Size (MB) | CPU latency (ms) |
@@ -19,9 +21,21 @@ and served as a FastAPI app on Vercel.
 to ONNX (`model/mobilenet_v3_small.onnx`) so the server only needs `onnxruntime`, not PyTorch.
 
 ### Classes
-Apple — Black rot, Cedar apple rust · Cherry — healthy · Corn — Cercospora/Gray leaf spot, Common rust ·
-Grape — healthy · Orange — Huanglongbing (citrus greening) · Peach — healthy · Potato — Late blight ·
-Raspberry — healthy · Tomato — Bacterial spot, Yellow leaf curl virus
+
+| Crop | Condition |
+|---|---|
+| Apple | Black rot |
+| Apple | Cedar apple rust |
+| Cherry | Healthy |
+| Corn (maize) | Cercospora leaf spot / Gray leaf spot |
+| Corn (maize) | Common rust |
+| Grape | Healthy |
+| Orange | Huanglongbing (citrus greening) |
+| Peach | Healthy |
+| Potato | Late blight |
+| Raspberry | Healthy |
+| Tomato | Bacterial spot |
+| Tomato | Yellow leaf curl virus |
 
 ## Project layout
 
@@ -41,10 +55,14 @@ data/pull_data.py      Downloads the dataset via kagglehub
 curl -F "file=@leaf.jpg" "https://crop-disease-classifier.vercel.app/api/predict?top_k=3"
 ```
 
+Example response (`top_k` lists the 3 most likely classes; shortened here):
+
 ```json
 {
   "prediction": {"label": "Tomato___Bacterial_spot", "crop": "Tomato", "condition": "Bacterial spot", "confidence": 0.998},
-  "top_k": [ ... ]
+  "top_k": [
+    {"label": "Tomato___Bacterial_spot", "crop": "Tomato", "condition": "Bacterial spot", "confidence": 0.998}
+  ]
 }
 ```
 
@@ -72,5 +90,6 @@ Vercel detects the FastAPI `app` in `app.py` and installs `requirements.txt`.
 Import the GitHub repo at https://vercel.com/new (no settings needed), or run `vercel --prod`.
 
 ## Limitations
+
 PlantVillage images are lab photos of single leaves on plain backgrounds; accuracy on field photos
 will be lower. The model only knows these 12 classes and will always pick one of them.

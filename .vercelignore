@@ -5,3 +5,4 @@ train.py
 export_onnx.py
 data
 requirements-train.txt
+docs
