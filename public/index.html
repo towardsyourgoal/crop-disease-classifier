@@ -26,6 +26,13 @@
   .bar span { display:block; height:100%; background:var(--accent); }
   .err { color:#c0392b; }
   small { color:var(--muted); }
+  .warn { margin-top:12px; padding:10px 12px; border-radius:8px; background:#fff4d6; color:#7a5600; font-size:.9rem; }
+  @media (prefers-color-scheme: dark) { .warn { background:#3a2f10; color:#f1d48a; } }
+  h2 { font-size:1rem; margin:24px 0 8px; }
+  #samples { display:grid; grid-template-columns:repeat(auto-fill, minmax(84px, 1fr)); gap:8px; }
+  #samples button { padding:0; border:2px solid transparent; border-radius:8px; overflow:hidden; cursor:pointer; background:none; }
+  #samples button:hover, #samples button:focus-visible { border-color:var(--accent); }
+  #samples img { display:block; width:100%; aspect-ratio:1; object-fit:cover; }
 </style>
 </head>
 <body>
@@ -37,7 +44,10 @@
     <img id="preview" alt="Uploaded leaf">
     <div id="result"></div>
   </div>
-  <p><small>Supported: Apple (black rot, cedar apple rust), Cherry (healthy), Corn (gray leaf spot, common rust), Grape (healthy), Orange (citrus greening), Peach (healthy), Potato (late blight), Raspberry (healthy), Tomato (bacterial spot, yellow leaf curl virus).</small></p>
+  <h2>No leaf photo handy? Try a sample</h2>
+  <p class="sub" style="margin-bottom:8px"><small>Held-out test images the model never saw during training.</small></p>
+  <div id="samples"></div>
+  <p><small>The model only recognises these 12 classes and works best on a single leaf against a plain background. Supported: Apple (black rot, cedar apple rust), Cherry (healthy), Corn (gray leaf spot, common rust), Grape (healthy), Orange (citrus greening), Peach (healthy), Potato (late blight), Raspberry (healthy), Tomato (bacterial spot, yellow leaf curl virus).</small></p>
 </main>
 <script>
 const drop = document.getElementById('drop'), input = document.getElementById('file');
@@ -51,18 +61,46 @@ input.onchange = () => input.files[0] && run(input.files[0]);
 
 const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
+const SAMPLES = ['apple-0', 'apple-1', 'cherry-2', 'corn-3', 'corn-4', 'grape-5',
+                 'orange-6', 'peach-7', 'potato-8', 'raspberry-9', 'tomato-10', 'tomato-11'];
+const samplesEl = document.getElementById('samples');
+SAMPLES.forEach(n => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.title = 'Try this sample';
+  b.innerHTML = `<img src="/samples/${n}.jpg" alt="Sample leaf ${n}" loading="lazy">`;
+  b.onclick = async () => run(await (await fetch(`/samples/${n}.jpg`)).blob());
+  samplesEl.appendChild(b);
+});
+
+// Downscale in the browser so big phone photos stay well under Vercel's 4.5 MB request limit
+function shrink(file, maxSide = 512) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, maxSide / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      c.toBlob(b => b ? resolve(b) : reject(new Error('Could not process image')), 'image/jpeg', 0.92);
+    };
+    img.onerror = () => reject(new Error('This browser cannot read that file. Please use a JPG or PNG.'));
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 async function run(file) {
   preview.src = URL.createObjectURL(file); preview.style.display = 'block';
-  result.innerHTML = '<small>Predicting…</small>';
-  const fd = new FormData(); fd.append('file', file);
+  result.innerHTML = '<small>Predicting… (the first request can take a few seconds while the server wakes up)</small>';
   try {
+    const fd = new FormData(); fd.append('file', await shrink(file), 'image.jpg');
     const r = await fetch('/api/predict?top_k=3', { method: 'POST', body: fd });
-    const j = await r.json();
-    if (!r.ok) throw new Error(j.detail || r.statusText);
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.detail || `Server error (${r.status})`);
     const p = j.prediction;
     result.innerHTML = `<div class="top">${esc(p.crop)} — ${esc(p.condition)}</div>` +
       j.top_k.map(t => `<div class="row"><div class="lbl"><span>${esc(t.crop)} — ${esc(t.condition)}</span>` +
-        `<span>${(t.confidence * 100).toFixed(1)}%</span></div><div class="bar"><span style="width:${t.confidence * 100}%"></span></div></div>`).join('');
+        `<span>${(t.confidence * 100).toFixed(1)}%</span></div><div class="bar"><span style="width:${t.confidence * 100}%"></span></div></div>`).join('') +
+      (p.confidence < 0.6 ? `<div class="warn">Low confidence. This may not be one of the 12 supported leaf types, or the photo differs a lot from the training images.</div>` : '');
   } catch (e) {
     result.innerHTML = `<p class="err">Error: ${esc(e.message)}</p>`;
   }

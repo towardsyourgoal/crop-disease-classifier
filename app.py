@@ -5,7 +5,8 @@ import numpy as np
 import onnxruntime as ort
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
-from PIL import Image, UnidentifiedImageError
+from fastapi.staticfiles import StaticFiles
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 ROOT = Path(__file__).parent
 MODEL_PATH = ROOT / "model" / "mobilenet_v3_small.onnx"
@@ -34,10 +35,12 @@ MAX_BYTES = 4 * 1024 * 1024  # Vercel request body limit is 4.5 MB
 session = ort.InferenceSession(str(MODEL_PATH), providers=["CPUExecutionProvider"])
 
 app = FastAPI(title="Crop Disease Classifier")
+# on Vercel, public/ is served by the CDN; this mount covers local runs
+app.mount("/samples", StaticFiles(directory=ROOT / "public" / "samples"), name="samples")
 
 
 def preprocess(img: Image.Image) -> np.ndarray:
-    img = img.convert("RGB").resize((224, 224), Image.BILINEAR)
+    img = ImageOps.exif_transpose(img).convert("RGB").resize((224, 224), Image.BILINEAR)
     x = (np.asarray(img, dtype=np.float32) / 255.0 - MEAN) / STD
     return x.transpose(2, 0, 1)[None]  # HWC -> NCHW
 
@@ -67,7 +70,8 @@ async def predict(file: UploadFile = File(...), top_k: int = 3):
         raise HTTPException(413, "Image too large (max 4 MB)")
     try:
         img = Image.open(io.BytesIO(data))
-    except UnidentifiedImageError:
+        img.load()
+    except (UnidentifiedImageError, OSError):
         raise HTTPException(400, "File is not a valid image")
 
     logits = session.run(None, {"image": preprocess(img)})[0][0]
