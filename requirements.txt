@@ -1,0 +1,6 @@
+# Runtime dependencies for the Vercel deployment (training deps: requirements-train.txt)
+fastapi>=0.115
+python-multipart>=0.0.9
+onnxruntime>=1.20
+numpy>=1.26
+pillow>=10.0

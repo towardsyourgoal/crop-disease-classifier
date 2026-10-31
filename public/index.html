@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Crop Disease Classifier</title>
+<style>
+  :root { --bg:#f6f8f4; --card:#fff; --ink:#1d2a1f; --muted:#5f6d61; --accent:#2f7d3a; --line:#dfe6dc; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#111612; --card:#1a211b; --ink:#e6efe6; --muted:#9aaa9c; --accent:#5cbf6a; --line:#2b352c; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, sans-serif; background:var(--bg); color:var(--ink); }
+  main { max-width:640px; margin:0 auto; padding:40px 16px; }
+  h1 { margin:0 0 4px; font-size:1.6rem; }
+  p.sub { margin:0 0 24px; color:var(--muted); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:20px; }
+  #drop { border:2px dashed var(--line); border-radius:10px; padding:32px 16px; text-align:center; cursor:pointer; color:var(--muted); }
+  #drop.over { border-color:var(--accent); color:var(--accent); }
+  #preview { display:none; max-width:100%; max-height:300px; margin:16px auto 0; border-radius:8px; }
+  #result { margin-top:20px; }
+  .top { font-size:1.2rem; font-weight:600; }
+  .row { margin:10px 0; }
+  .row .lbl { display:flex; justify-content:space-between; font-size:.9rem; margin-bottom:4px; }
+  .bar { height:8px; background:var(--line); border-radius:4px; overflow:hidden; }
+  .bar span { display:block; height:100%; background:var(--accent); }
+  .err { color:#c0392b; }
+  small { color:var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Crop Disease Classifier</h1>
+  <p class="sub">Upload a leaf photo. MobileNetV3-Small, trained on 12 PlantVillage classes.</p>
+  <div class="card">
+    <div id="drop">Click or drop an image here<input id="file" type="file" accept="image/*" hidden></div>
+    <img id="preview" alt="Uploaded leaf">
+    <div id="result"></div>
+  </div>
+  <p><small>Supported: Apple (black rot, cedar apple rust), Cherry (healthy), Corn (gray leaf spot, common rust), Grape (healthy), Orange (citrus greening), Peach (healthy), Potato (late blight), Raspberry (healthy), Tomato (bacterial spot, yellow leaf curl virus).</small></p>
+</main>
+<script>
+const drop = document.getElementById('drop'), input = document.getElementById('file');
+const preview = document.getElementById('preview'), result = document.getElementById('result');
+
+drop.onclick = () => input.click();
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); if (e.dataTransfer.files[0]) run(e.dataTransfer.files[0]); };
+input.onchange = () => input.files[0] && run(input.files[0]);
+
+const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+async function run(file) {
+  preview.src = URL.createObjectURL(file); preview.style.display = 'block';
+  result.innerHTML = '<small>Predicting…</small>';
+  const fd = new FormData(); fd.append('file', file);
+  try {
+    const r = await fetch('/api/predict?top_k=3', { method: 'POST', body: fd });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.detail || r.statusText);
+    const p = j.prediction;
+    result.innerHTML = `<div class="top">${esc(p.crop)} — ${esc(p.condition)}</div>` +
+      j.top_k.map(t => `<div class="row"><div class="lbl"><span>${esc(t.crop)} — ${esc(t.condition)}</span>` +
+        `<span>${(t.confidence * 100).toFixed(1)}%</span></div><div class="bar"><span style="width:${t.confidence * 100}%"></span></div></div>`).join('');
+  } catch (e) {
+    result.innerHTML = `<p class="err">Error: ${esc(e.message)}</p>`;
+  }
+}
+</script>
+</body>
+</html>

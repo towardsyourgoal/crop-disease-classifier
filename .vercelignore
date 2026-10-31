@@ -1,0 +1,7 @@
+.venv
+*.ipynb
+*.pt
+train.py
+export_onnx.py
+data
+requirements-train.txt

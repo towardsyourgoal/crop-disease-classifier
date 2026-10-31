@@ -1,0 +1,10 @@
+kagglehub
+pandas
+torch
+torchvision
+scikit-learn
+matplotlib
+seaborn
+onnx
+onnxscript
+onnxruntime
