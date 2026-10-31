@@ -100,7 +100,7 @@ async function run(file) {
     result.innerHTML = `<div class="top">${esc(p.crop)} — ${esc(p.condition)}</div>` +
       j.top_k.map(t => `<div class="row"><div class="lbl"><span>${esc(t.crop)} — ${esc(t.condition)}</span>` +
         `<span>${(t.confidence * 100).toFixed(1)}%</span></div><div class="bar"><span style="width:${t.confidence * 100}%"></span></div></div>`).join('') +
-      (p.confidence < 0.6 ? `<div class="warn">Low confidence. This may not be one of the 12 supported leaf types, or the photo differs a lot from the training images.</div>` : '');
+      (p.confidence < 0.8 ? `<div class="warn">Low confidence. This may not be one of the 12 supported leaf types, or the photo differs a lot from the training images.</div>` : '');
   } catch (e) {
     result.innerHTML = `<p class="err">Error: ${esc(e.message)}</p>`;
   }

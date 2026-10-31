@@ -8,7 +8,19 @@ and served as a FastAPI app on Vercel.
 
 <a href="https://crop-disease-classifier.vercel.app"><img src="docs/screenshot.png" alt="Crop Disease Classifier web app" width="600"></a>
 
-## Model comparison (held-out test set, 1,952 images)
+**Main notebook: [`crop_disease_classification.ipynb`](crop_disease_classification.ipynb)**: data exploration,
+training, evaluation and business recommendation, with explanations.
+
+## Key findings
+
+- **Data:** 54,305 images, 38 classes, 36 : 1 class imbalance. 12 random classes used (18,600 images after
+  removing 21 duplicates), split 70 / 20 / 10 stratified.
+- **Shortcut risk:** images are lab photos and background brightness differs strongly by class, so the very
+  high test accuracy is likely optimistic for real field photos.
+- **Errors:** MobileNetV3-Small gets 3 of 1,953 test images wrong, all with confidence below 80%; correct
+  predictions have a median confidence of 100%. An 80% threshold catches all 3 errors.
+
+## Model comparison (held-out test set)
 
 | Model | Accuracy | Macro F1 | Params (M) | Size (MB) | CPU latency (ms) |
 |---|---|---|---|---|---|
@@ -17,8 +29,20 @@ and served as a FastAPI app on Vercel.
 | resnet18 | 0.992 | 0.987 | 11.18 | 44.8 | 55.9 |
 | regnet_x_400mf | 0.998 | 0.998 | 5.10 | 20.7 | 25.0 |
 
-**MobileNetV3-Small** is deployed: it has the best macro F1 and a small footprint. It is exported
-to ONNX (`model/mobilenet_v3_small.onnx`) so the server only needs `onnxruntime`, not PyTorch.
+CPU latency: median time for one image on a single CPU thread. Pretrained models were fine-tuned from ImageNet
+weights; `small_cnn` was trained from scratch.
+
+## Business recommendation
+
+**Deploy MobileNetV3-Small in Syngenta's farmer app.** It ties for the best test result (99.8% accuracy,
+0.998 macro-F1) with RegNetX-400MF but is 3.3× smaller (6.2 MB vs 20.7 MB), which matters for farmers who
+download apps over slow rural connections and need diagnosis to work offline on low-cost phones. At 35 ms per
+image on one CPU thread it is far faster than a user can notice, and it was designed for mobile chips, so it
+converts directly to TensorFlow Lite / Core ML / ONNX and can be quantised to int8 for a further ~4× size
+reduction. ResNet18 is 7× larger and less accurate, and the small CNN makes about 40× more errors, which is
+not acceptable when a wrong diagnosis means the wrong crop protection product. Before launch, the model must
+be validated on real field photos (PlantVillage images are lab photos), and the app should ask for a retake
+when confidence is below 80%.
 
 ### Classes
 
@@ -40,13 +64,14 @@ to ONNX (`model/mobilenet_v3_small.onnx`) so the server only needs `onnxruntime`
 ## Project layout
 
 ```
-app.py                 FastAPI app (web UI at /, API at /api/*)
-public/index.html      Upload page
-model/                 Deployed ONNX model
-train.py               Data prep + training of all 4 models
-eda.ipynb, eval.ipynb  Exploration and evaluation
-export_onnx.py         Converts mobilenet_v3_small.pt -> ONNX
-data/pull_data.py      Downloads the dataset via kagglehub
+crop_disease_classification.ipynb  Main notebook: EDA, training, evaluation, recommendation
+train.py                           Same pipeline as a script (trains and saves all 4 models)
+mobilenet_v3_small.pt              Trained weights of the chosen model (PyTorch state_dict)
+export_onnx.py                     Converts mobilenet_v3_small.pt -> model/mobilenet_v3_small.onnx
+model/                             Deployed ONNX model
+app.py, public/                    Web app (FastAPI) and upload page
+data/pull_data.py                  Downloads the dataset via kagglehub
+archive/                           Earlier working notebooks (superseded by the main notebook)
 ```
 
 ## API
@@ -76,12 +101,22 @@ uvicorn app:app --reload
 # open http://localhost:8000
 ```
 
-## Training
+## Setup: notebook and training
+
+Requires Python 3.10+ and a free Kaggle account (the dataset downloads automatically via `kagglehub`).
 
 ```bash
-pip install -r requirements-train.txt
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements-train.txt jupyter
+jupyter notebook crop_disease_classification.ipynb
+```
+
+The notebook loads the saved weights by default (`TRAIN = False`); set `TRAIN = True` to retrain all four
+models (about 1–2 hours on a GPU, much longer on CPU). Alternatively:
+
+```bash
 python train.py           # trains and saves <model>.pt
-python export_onnx.py     # exports the best model to model/
+python export_onnx.py     # exports the chosen model to model/
 ```
 
 ## Deploy

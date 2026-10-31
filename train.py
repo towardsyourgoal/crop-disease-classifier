@@ -110,19 +110,20 @@ train_loader=DataLoader(plantdataset(train_df, aug_train_df),
 
 val_loader=DataLoader(plantdataset(val_df, aug_val_df),
                       batch_size=BATCH_SIZE,
-                      shuffle=True,
+                      shuffle=False,
                       num_workers=NUM_WORKERS,
                       pin_memory=pin,
-                      drop_last=True)
+                      drop_last=False)
 
 test_loader=DataLoader(plantdataset(test_df, aug_val_df),
                        batch_size=BATCH_SIZE,
-                       shuffle=True,
+                       shuffle=False,
                        num_workers=NUM_WORKERS,
                        pin_memory=pin,
-                       drop_last=True)
+                       drop_last=False)
 
-print(len(train_loader), len(val_loader), len(test_loader) , " batches") #813 226 122
+# val/test are not shuffled and keep every image, so prediction i matches row i of val_df/test_df
+print(len(train_loader), len(val_loader), len(test_loader) , " batches")
 
 # device setup , if cuda if running through a GPU
 device=torch.device("cuda" if torch.cuda.is_available() else 'cpu')
