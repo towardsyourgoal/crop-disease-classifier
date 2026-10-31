@@ -35,8 +35,12 @@ MAX_BYTES = 4 * 1024 * 1024  # Vercel request body limit is 4.5 MB
 session = ort.InferenceSession(str(MODEL_PATH), providers=["CPUExecutionProvider"])
 
 app = FastAPI(title="Crop Disease Classifier")
-# on Vercel, public/ is served by the CDN; this mount covers local runs
-app.mount("/samples", StaticFiles(directory=ROOT / "public" / "samples"), name="samples")
+
+# On Vercel, public/ is served by the CDN and is not bundled into this function,
+# so only mount it when it exists (local runs).
+PUBLIC = ROOT / "public"
+if (PUBLIC / "samples").is_dir():
+    app.mount("/samples", StaticFiles(directory=PUBLIC / "samples"), name="samples")
 
 
 def preprocess(img: Image.Image) -> np.ndarray:
@@ -55,7 +59,7 @@ def pretty(name: str) -> dict:
 
 @app.get("/")
 def index():
-    return FileResponse(ROOT / "public" / "index.html")
+    return FileResponse(PUBLIC / "index.html")
 
 
 @app.get("/api/health")
